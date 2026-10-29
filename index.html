@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#16251e">
+  <title>VIT Walk | Campus Navigation Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17251e;
+      --muted: #69766e;
+      --paper: #f4f3ed;
+      --surface: #fffefa;
+      --line: #dce0d7;
+      --green: #176b63;
+      --lime: #b8f0df;
+      --orange: #e66b4e;
+      --soft-green: #e7f5f2;
+      --route-blue: #1769e0;
+      --route-amber: #c65d18;
+      --route-violet: #7b4bcc;
+      --network: #536b7c;
+      --mono: "DM Mono", ui-monospace, monospace;
+      --sans: "DM Sans", sans-serif;
+      --display: "Space Grotesk", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); }
+    button, select { font: inherit; }
+    button { cursor: pointer; }
+    .topbar { height: 66px; display: flex; align-items: center; justify-content: space-between; padding: 0 26px; background: #142b35; color: white; }
+    .brand { display: flex; align-items: center; gap: 12px; font: 700 17px var(--display); }
+    .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; color: var(--ink); background: var(--lime); border-radius: 8px 8px 8px 2px; }
+    .brand-mark svg { width: 17px; height: 17px; }
+    .brand-name { letter-spacing: 0; }
+    .top-meta { display: flex; align-items: center; gap: 18px; color: #c7d2ca; font: 11px var(--mono); text-transform: uppercase; }
+    .live-dot { width: 7px; height: 7px; display: inline-block; margin-right: 7px; background: var(--lime); border-radius: 50%; }
+    .app { height: calc(100vh - 66px); min-height: 590px; display: grid; grid-template-columns: minmax(340px, 390px) minmax(0, 1fr); }
+    .sidebar { position: relative; z-index: 2; display: flex; flex-direction: column; overflow-y: auto; background: var(--surface); border-right: 1px solid var(--line); }
+    .sidebar-head { padding: 27px 25px 21px; border-bottom: 1px solid var(--line); }
+    .eyebrow { color: var(--green); font: 500 10px var(--mono); letter-spacing: 0; text-transform: uppercase; }
+    h1 { margin: 9px 0 7px; font: 600 29px/1.08 var(--display); letter-spacing: 0; }
+    .subtitle { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .route-form { padding: 22px 25px 20px; border-bottom: 1px solid var(--line); }
+    .field { display: block; margin-bottom: 14px; }
+    .field-label { display: block; margin-bottom: 7px; color: var(--ink); font: 600 11px var(--sans); }
+    .range-row { display: flex; align-items: center; gap: 10px; }
+    input[type="range"] { flex: 1; accent-color: var(--green); }
+    .range-value { min-width: 62px; color: var(--green); font: 600 11px var(--mono); text-align: right; }
+    .select-wrap { position: relative; }
+    select { width: 100%; height: 47px; appearance: none; padding: 0 35px 0 12px; border: 1px solid #cbd2c9; border-radius: 8px; outline: none; background: white; color: var(--ink); font-size: 13px; }
+    select:focus { border-color: var(--green); box-shadow: 0 0 0 3px #22654722; }
+    .select-wrap::after { content: "⌄"; position: absolute; top: 8px; right: 12px; color: var(--muted); font-size: 18px; pointer-events: none; }
+    .form-actions { display: flex; gap: 8px; margin-top: 17px; }
+    .primary-button { min-height: 46px; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 8px; background: var(--green); color: white; font-weight: 700; font-size: 13px; transition: background 150ms ease, transform 150ms ease; }
+    .primary-button:hover { background: #105650; transform: translateY(-1px); }
+    .primary-button:disabled { opacity: .6; cursor: wait; transform: none; }
+    .primary-button svg { width: 16px; height: 16px; }
+    .swap-button { width: 46px; min-height: 46px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); }
+    .swap-button:hover { background: var(--soft-green); }
+    .swap-button svg { width: 17px; height: 17px; }
+    .status { min-height: 18px; margin-top: 11px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .status.error { color: #a43c2b; }
+    .results { display: none; padding: 20px 25px 21px; border-bottom: 1px solid var(--line); }
+    .results.visible { display: block; animation: rise-in 230ms ease both; }
+    @keyframes rise-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 13px; }
+    h2 { margin: 0; font: 600 15px var(--display); }
+    .tiny-tag { color: var(--green); font: 10px var(--mono); text-transform: uppercase; }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+    .metric { padding: 12px; border: 1px solid #e0e8e3; border-radius: 8px; background: #f7faf8; }
+    .metric-label { color: var(--muted); font: 9px var(--mono); text-transform: uppercase; }
+    .metric-value { margin-top: 4px; font: 600 19px var(--display); }
+    .metric-value small { color: var(--muted); font: 11px var(--sans); }
+    .algorithm-list { display: grid; gap: 6px; }
+    .algorithm-row { display: grid; grid-template-columns: 56px 1fr auto; align-items: center; gap: 8px; padding: 10px 9px; border: 1px solid var(--line); border-radius: 7px; background: white; text-align: left; color: var(--ink); }
+    .algorithm-row:hover { background: #f6f7f1; }
+    .algorithm-row.active { border-color: #8bbeb7; background: var(--soft-green); box-shadow: 0 0 0 2px #176b6312; }
+    .algo-name { font: 600 12px var(--display); }
+    .algo-detail { color: var(--muted); font: 10px var(--mono); }
+    .algo-cost { font: 500 11px var(--mono); white-space: nowrap; }
+    .route-notes { margin: 13px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .route-notes strong { color: var(--ink); font-weight: 600; }
+    .data-note { margin-top: auto; padding: 17px 25px 20px; background: #f3f6f3; color: var(--muted); font-size: 10px; line-height: 1.6; }
+    .data-note strong { color: var(--ink); font-weight: 600; }
+    .data-source { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); font: 9px var(--mono); text-transform: uppercase; }
+    .data-source a { color: var(--green); text-decoration: none; }
+    .map-shell { position: relative; min-width: 0; min-height: 0; background: #e7eceb; }
+    #map { width: 100%; height: 100%; min-height: 400px; }
+    .map-chip { position: absolute; z-index: 500; top: 16px; left: 16px; display: flex; align-items: center; gap: 9px; padding: 11px 14px; border: 1px solid #ffffff; border-radius: 9px; background: #fffefaf2; box-shadow: 0 3px 16px #17251e1c; color: var(--ink); font: 10px var(--mono); text-transform: uppercase; pointer-events: none; }
+    .map-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px #176b6322; }
+    .map-help { position: absolute; z-index: 500; right: 16px; top: 16px; padding: 10px 12px; border: 1px solid #ffffff; border-radius: 9px; background: #fffefaf2; box-shadow: 0 3px 16px #17251e1c; color: var(--muted); font-size: 11px; }
+    .map-help span { color: var(--route-blue); font-weight: 700; }
+    .map-legend { position: absolute; z-index: 500; left: 16px; bottom: 28px; display: grid; gap: 9px; min-width: 178px; padding: 12px 14px; border: 1px solid #ffffff; border-radius: 9px; background: #fffefaf2; box-shadow: 0 3px 16px #17251e1c; color: var(--ink); font-size: 11px; pointer-events: none; }
+    .legend-item { display: flex; align-items: center; gap: 9px; }
+    .legend-line { width: 22px; height: 0; border-top: 3px solid var(--selected-route, var(--route-blue)); border-radius: 3px; }
+    .legend-line.network { border-top: 2px solid var(--network); opacity: .8; }
+    .legend-line.connector { border-top: 2px dashed #d88a19; }
+    .legend-dot { width: 10px; height: 10px; margin: 0 6px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 0 1px #52616b; }
+    .legend-dot.start { background: var(--green); }
+    .legend-dot.destination { background: var(--orange); }
+    .map-legend-note { color: var(--muted); font-size: 10px; }
+    .leaflet-container { font-family: var(--sans); }
+    .leaflet-control-attribution { font-size: 9px !important; }
+    .route-marker { width: 19px; height: 19px; border: 3px solid white; border-radius: 50%; box-shadow: 0 1px 8px #17251e80; }
+    .route-marker.start { background: var(--green); }
+    .route-marker.end { background: var(--orange); }
+    .leaflet-tooltip { border: 0; border-radius: 3px; box-shadow: 0 2px 9px #17251e24; color: var(--ink); font: 11px var(--sans); }
+    .leaflet-tooltip::before { border-top-color: white; }
+    .leaflet-bar a { color: var(--ink) !important; }
+
+    @media (max-width: 860px) {
+      .app { height: auto; min-height: calc(100vh - 58px); align-content: start; grid-template-columns: 1fr; grid-template-rows: max-content max-content minmax(390px, 52vh) max-content max-content; }
+      .topbar { height: 58px; padding: 0 16px; }
+      .top-meta { gap: 8px; font-size: 9px; }
+      .sidebar { display: contents; }
+      .sidebar-head { grid-row: 1; padding: 19px 19px 14px; }
+      .route-form { grid-row: 2; align-self: start; padding: 16px 19px; }
+      .map-shell { grid-row: 3; height: 52vh; min-height: 390px; }
+      .results { grid-row: 4; padding: 16px 19px; }
+      .data-note { grid-row: 5; padding: 14px 19px; }
+      .map-chip { top: 10px; left: 10px; }
+      .map-help { top: auto; bottom: 12px; right: 10px; max-width: 190px; }
+      .map-legend { left: 10px; bottom: 12px; min-width: 0; padding: 10px 11px; }
+      .map-legend-note { display: none; }
+    }
+    @media (max-width: 420px) {
+      .brand { gap: 8px; font-size: 15px; }
+      .top-meta .status-label { display: none; }
+      .sidebar-head, .route-form, .results { padding-left: 15px; padding-right: 15px; }
+      .data-note { padding-left: 15px; padding-right: 15px; }
+      h1 { font-size: 25px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark"><i data-lucide="waypoints"></i></span>
+      <span class="brand-name">VIT Walk</span>
+    </div>
+    <div class="top-meta">
+      <span><span class="live-dot"></span><span class="status-label">OSM WALK NETWORK</span></span>
+      <span>VELLORE · IN</span>
+    </div>
+  </header>
+
+  <main class="app">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <div class="eyebrow">Campus Navigation Assistant / A*</div>
+        <h1>Find your way<br>across VIT.</h1>
+        <p class="subtitle">Choose two places to find and compare walking routes across campus.</p>
+      </div>
+
+      <form class="route-form" id="route-form">
+        <label class="field">
+          <span class="field-label">From</span>
+          <span class="select-wrap"><select id="start-select" required aria-label="Starting point"></select></span>
+        </label>
+        <label class="field">
+          <span class="field-label">To</span>
+          <span class="select-wrap"><select id="goal-select" required aria-label="Destination"></select></span>
+        </label>
+        <label class="field">
+          <span class="field-label">Crowd level</span>
+          <span class="range-row">
+            <input id="crowd-factor" type="range" min="1" max="1.5" step="0.05" value="1" aria-label="Crowd level">
+            <span class="range-value" id="crowd-factor-value">Normal</span>
+          </span>
+        </label>
+        <div class="form-actions">
+          <button class="primary-button" id="route-button" type="submit"><i data-lucide="route"></i><span>Find walking route</span></button>
+          <button class="swap-button" id="swap-button" type="button" title="Swap start and destination" aria-label="Swap start and destination"><i data-lucide="arrow-up-down"></i></button>
+        </div>
+        <div class="status" id="status" role="status" aria-live="polite">Loading campus map…</div>
+      </form>
+
+      <section class="results" id="results" aria-live="polite">
+        <div class="section-head">
+          <h2 id="route-heading">Best route</h2>
+          <span class="tiny-tag" id="algorithm-tag">A* optimum</span>
+        </div>
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">Walking distance</div><div class="metric-value" id="distance-value">— <small>m</small></div></div>
+          <div class="metric"><div class="metric-label">Time estimate</div><div class="metric-value" id="time-value">— <small>min</small></div></div>
+        </div>
+        <div class="section-head"><h2>Algorithm comparison</h2><span class="tiny-tag">Modeled cost · select to map</span></div>
+        <div class="algorithm-list" id="algorithm-list"></div>
+        <p class="route-notes" id="route-notes"></p>
+      </section>
+
+      <div class="data-note">
+        <strong>Map data &amp; measurement</strong><br>
+        Edge weights follow OpenStreetMap walkway and campus-access geometry. The crowd selector applies a transparent cost multiplier: normal 1.00×, moderate 1.25×, or high 1.50×. This is a scenario setting, not a live crowd feed. Approximate straight-line landmark-to-path offsets are included in route totals. Time assumes 1.4 m/s.
+        <div class="data-source">
+          <span id="source-date">Map source</span>
+          <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>
+        </div>
+      </div>
+    </aside>
+
+    <section class="map-shell" aria-label="Campus route map">
+      <div class="map-chip"><span class="map-chip-dot"></span><span id="map-title">VIT Vellore · Walk network</span></div>
+      <div class="map-help"><span>Tip</span> · Use + / − or scroll to zoom</div>
+      <div class="map-legend" aria-label="Map legend">
+        <div class="legend-item"><span class="legend-line network"></span><span>Campus walking paths</span></div>
+        <div class="legend-item"><span class="legend-line"></span><span>Selected route</span></div>
+        <div class="legend-item"><span class="legend-line connector"></span><span>Approx. building access</span></div>
+        <div class="legend-item"><span class="legend-dot start"></span><span>Start</span></div>
+        <div class="legend-item"><span class="legend-dot destination"></span><span>Destination</span></div>
+        <div class="map-legend-note">Choose an algorithm to change the route color.</div>
+      </div>
+      <div id="map" role="application" aria-label="Interactive map of VIT Vellore campus"></div>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    const startSelect = document.getElementById('start-select');
+    const goalSelect = document.getElementById('goal-select');
+    const crowdFactor = document.getElementById('crowd-factor');
+    const crowdFactorValue = document.getElementById('crowd-factor-value');
+    const routeForm = document.getElementById('route-form');
+    const routeButton = document.getElementById('route-button');
+    const statusLine = document.getElementById('status');
+    const resultsPanel = document.getElementById('results');
+    const algorithmList = document.getElementById('algorithm-list');
+    const routeNotes = document.getElementById('route-notes');
+    let campusData;
+    let map;
+    let graphLayer;
+    let landmarkLayer;
+    let routeLayer;
+    function crowdLabel(value) {
+      return value >= 1.45 ? 'High' : value >= 1.2 ? 'Moderate' : 'Normal';
+    }
+    crowdFactor.addEventListener('input', () => {
+      crowdFactorValue.textContent = `${crowdLabel(Number(crowdFactor.value))} (${Number(crowdFactor.value).toFixed(2)}×)`;
+    });
+    let activeResults = [];
+    let activeAlgorithm = 'A*';
+
+    function setStatus(message, isError = false) {
+      statusLine.textContent = message;
+      statusLine.classList.toggle('error', isError);
+    }
+
+    function addLandmarks() {
+      const groups = [
+        { category: 'Hostel', label: 'Hostels' },
+        { category: 'Campus place', label: 'Campus places' }
+      ];
+      for (const select of [startSelect, goalSelect]) {
+        for (const group of groups) {
+          const landmarks = campusData.landmarks
+            .filter(item => (item.category || 'Campus place') === group.category)
+            .sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name));
+          if (!landmarks.length) continue;
+          const optionGroup = document.createElement('optgroup');
+          optionGroup.label = group.label;
+          for (const landmark of landmarks) {
+            const option = document.createElement('option');
+            option.value = landmark.id;
+            option.textContent = landmark.display_name || landmark.name;
+            optionGroup.append(option);
+          }
+          select.append(optionGroup);
+        }
+      }
+      startSelect.value = 'main_gate_uni_entrance';
+      goalSelect.value = 'a_block';
+    }
+
+    function drawCampus() {
+      map = L.map('map', { zoomControl: true, scrollWheelZoom: true }).setView([12.9719, 79.1602], 16);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 20,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+      }).addTo(map);
+
+      const nodes = new Map(campusData.nodes.map(node => [node.id, node]));
+      const segments = campusData.edges.map(edge => {
+        const first = nodes.get(edge.from);
+        const second = nodes.get(edge.to);
+        return first && second ? [[first.lat, first.lon], [second.lat, second.lon]] : null;
+      }).filter(Boolean);
+      graphLayer = L.polyline(segments, {
+        color: '#536b7c', weight: 2.6, opacity: 0.78, lineCap: 'round', lineJoin: 'round'
+      }).addTo(map);
+
+      landmarkLayer = L.layerGroup().addTo(map);
+      for (const landmark of campusData.landmarks) {
+        const featurePoint = [landmark.feature_lat, landmark.feature_lon];
+        const accessPoint = [landmark.lat, landmark.lon];
+        if (landmark.snap_distance_m > 1) {
+          L.polyline([featurePoint, accessPoint], {
+            color: '#d88a19', weight: 2, opacity: 0.9, dashArray: '5 5'
+          }).addTo(landmarkLayer);
+          L.circleMarker(accessPoint, {
+            radius: 3, color: '#fffefa', weight: 1.5, fillColor: '#176b63', fillOpacity: 1
+          }).addTo(landmarkLayer);
+        }
+        const tooltip = document.createElement('span');
+        tooltip.textContent = `${landmark.name} · ${Number(landmark.snap_distance_m).toFixed(0)} m to path`;
+        L.circleMarker(featurePoint, {
+          radius: 5, color: '#fffefa', weight: 2, fillColor: '#e66b4e', fillOpacity: 0.98
+        }).bindTooltip(tooltip, { direction: 'top', offset: [0, -4] }).addTo(landmarkLayer);
+      }
+      L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
+    }
+
+    function drawRoute(result) {
+      if (routeLayer) map.removeLayer(routeLayer);
+      if (!result || result.path.length === 0) return;
+      const points = result.path.map(node => [node.lat, node.lon]);
+      const routeColors = { 'A*': '#1769e0', Dijkstra: '#c65d18', BFS: '#7b4bcc' };
+      const color = routeColors[activeAlgorithm] || routeColors['A*'];
+      document.documentElement.style.setProperty('--selected-route', color);
+      const casing = L.polyline(points, {
+        color: '#ffffff', weight: 10, opacity: 0.95, lineCap: 'round', lineJoin: 'round'
+      });
+      const line = L.polyline(points, {
+        color, weight: 6, opacity: 1, lineCap: 'round', lineJoin: 'round'
+      });
+      const startIcon = L.divIcon({ className: '', html: '<span class="route-marker start"></span>', iconSize: [19, 19], iconAnchor: [9, 9] });
+      const endIcon = L.divIcon({ className: '', html: '<span class="route-marker end"></span>', iconSize: [19, 19], iconAnchor: [9, 9] });
+      routeLayer = L.featureGroup([
+        casing,
+        line,
+        L.marker(points[0], { icon: startIcon, keyboard: false }),
+        L.marker(points[points.length - 1], { icon: endIcon, keyboard: false })
+      ]).addTo(map);
+      map.fitBounds(line.getBounds().pad(0.16), { maxZoom: 17, animate: true });
+    }
+
+    function formatMeters(value) {
+      return value >= 1000 ? `${(value / 1000).toFixed(2)} km` : `${Math.round(value)} m`;
+    }
+
+    function renderResults(payload) {
+      activeResults = payload.results;
+      activeAlgorithm = 'A*';
+      const best = activeResults.find(item => item.algorithm === activeAlgorithm);
+      document.getElementById('route-heading').textContent = `${payload.start} to ${payload.goal}`;
+      if (!best || !best.path.length) {
+        resultsPanel.classList.add('visible');
+        document.getElementById('distance-value').textContent = 'No route';
+        document.getElementById('time-value').textContent = '—';
+        algorithmList.replaceChildren();
+        routeNotes.textContent = 'These destinations are not connected in the current mapped walkway network.';
+        drawRoute(null);
+        return;
+      }
+      document.getElementById('distance-value').innerHTML = `${formatMeters(best.distance_m)} <small></small>`;
+      document.getElementById('time-value').innerHTML = `${best.estimated_time_min.toFixed(1)} <small>min</small>`;
+      algorithmList.replaceChildren();
+      for (const result of activeResults) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `algorithm-row${result.algorithm === activeAlgorithm ? ' active' : ''}`;
+        button.setAttribute('aria-pressed', result.algorithm === activeAlgorithm ? 'true' : 'false');
+        const description = result.algorithm === 'BFS' ? 'fewest path segments' : 'lowest distance cost';
+        const cost = result.path.length ? `${formatMeters(result.cost_m)} eq.` : 'No route';
+        button.innerHTML = `<span class="algo-name">${result.algorithm}</span><span class="algo-detail">${result.nodes_expanded} expanded · ${description}</span><span class="algo-cost">${cost}</span>`;
+        button.addEventListener('click', () => {
+          activeAlgorithm = result.algorithm;
+          document.getElementById('algorithm-tag').textContent = activeAlgorithm === 'A*' ? 'A* optimum' : `${activeAlgorithm} selected`;
+          for (const row of algorithmList.querySelectorAll('.algorithm-row')) {
+            const active = row.querySelector('.algo-name').textContent === activeAlgorithm;
+            row.classList.toggle('active', active);
+            row.setAttribute('aria-pressed', active ? 'true' : 'false');
+          }
+          drawRoute(result);
+        });
+        algorithmList.append(button);
+      }
+      const startSnap = Number(payload.start_snap_m || 0).toFixed(0);
+      const goalSnap = Number(payload.goal_snap_m || 0).toFixed(0);
+      routeNotes.innerHTML = `<strong>${crowdLabel(payload.crowd_factor)} crowd scenario (${Number(payload.crowd_factor).toFixed(2)}× cost):</strong> Physical walking distance is shown above. Algorithm cards show modeled cost in km-equivalent; it is not extra walking distance. Access connectors: start ${startSnap} m · destination ${goalSnap} m.`;
+      resultsPanel.classList.add('visible');
+      drawRoute(best);
+    }
+
+    async function findRoute(event) {
+      if (event) event.preventDefault();
+      routeButton.disabled = true;
+      setStatus('Searching the mapped walk network…');
+      try {
+        const response = await fetch('/api/route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            start: startSelect.value,
+            goal: goalSelect.value,
+            crowd_factor: Number(crowdFactor.value)
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Route request failed');
+        renderResults(payload);
+        setStatus('Route calculated from the local campus graph.');
+      } catch (error) {
+        setStatus(error.message || 'Could not calculate this route.', true);
+      } finally {
+        routeButton.disabled = false;
+      }
+    }
+
+    document.getElementById('swap-button').addEventListener('click', () => {
+      const previousStart = startSelect.value;
+      startSelect.value = goalSelect.value;
+      goalSelect.value = previousStart;
+    });
+    routeForm.addEventListener('submit', findRoute);
+
+    async function initialize() {
+      if (window.lucide) window.lucide.createIcons();
+      if (!window.L) {
+        setStatus('The map library did not load. Check your internet connection.', true);
+        return;
+      }
+      try {
+        const response = await fetch('/api/map');
+        if (!response.ok) throw new Error('Could not load the campus graph.');
+        campusData = await response.json();
+        addLandmarks();
+        drawCampus();
+        document.getElementById('source-date').textContent = `OSM · ${campusData.source.retrieved}`;
+        await findRoute();
+      } catch (error) {
+        setStatus(error.message || 'Could not initialize the campus map.', true);
+      }
+    }
+
+    initialize();
+  </script>
+</body>
+</html>
