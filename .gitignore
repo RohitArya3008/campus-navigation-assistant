@@ -4,3 +4,5 @@ __pycache__/
 .pptx-output/
 *.pptx
 *.pdf
+!BCSE306L_Campus_Navigation_Presentation_v2.pptx
+!BCSE306L_TeamCampusNav_FinalReport.pdf

@@ -4,7 +4,13 @@ A working campus navigation project for VIT Vellore. The route-search core is im
 
 ## Run the demonstration
 
-Requires Python 3.10 or newer. From this folder, run the prepared Review 2 route:
+Requires Python 3.10 or newer. Install the web dependency once:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+From this folder, run the prepared Review 2 route:
 
 ```powershell
 python campus_nav.py
@@ -20,13 +26,13 @@ Each run compares A*, Dijkstra (uniform-cost search), and BFS, showing the route
 
 ## Web app
 
-Start the local server:
+Start the local Flask server:
 
 ```powershell
 python web_app.py
 ```
 
-Open `http://127.0.0.1:8000`. Choose two campus landmarks, calculate routes, and select A*, Dijkstra, or BFS to see its path on the map. The app needs an internet connection for OpenStreetMap tiles and the Leaflet map library; route calculation itself runs locally in Python.
+Open `http://127.0.0.1:8000`. Choose two campus landmarks, calculate routes, and select A*, Dijkstra, or BFS to see its path on the map. The Flask app needs an internet connection for OpenStreetMap tiles and the Leaflet map library; route calculation itself runs locally in Python.
 
 Run the automated checks:
 
