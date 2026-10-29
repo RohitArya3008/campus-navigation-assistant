@@ -1,2 +1,6 @@
 __pycache__/
 *.py[cod]
+.pptx-build/
+.pptx-output/
+*.pptx
+*.pdf
